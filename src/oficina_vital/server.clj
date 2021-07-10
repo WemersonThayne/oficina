@@ -2,9 +2,10 @@
   (:require [io.pedestal.http :as http]
             [io.pedestal.http.body-params :as body-params]
             [io.pedestal.http.route :as route]
-            [ring.util.response :as ring-resp]))
+            [ring.util.response :as ring-resp]
+            [oficina-vital.handler.order.order-service :as order-server]))
 
-(def common-interceptors-json [(body-params/body-params) http/json-body])
+(def ^:private common-interceptors-json [(body-params/body-params) http/json-body])
 
 (defn- ok [body]
         {:status 200 :body body})
@@ -15,25 +16,16 @@
 (defn- not-found []
         {:status 404 :body "Not found\n"})
 
-
-(defn- respond-hello [request]
-    ;nm   (get-in request [:query-params :name])
-  (let [resp "Hello, world!\n"]
-       (if resp
-       (ok resp)
-       (not-found))))
-
-(defn get-json
-  [request]
-  (ring-resp/response {:users [{:name "nome" } {:name "teste"} ]}))
+(defn- ^:private get-info [request]
+  (ring-resp/response {:version "1.0.0"}))
 
 (def ^:private base-url "/oficina/api/v1")
 
 (def routes
     (route/expand-routes
-      #{[(str base-url "/hello") :get respond-hello :route-name :hello]
-        ["/oficina/api/v1/info"  :get #(str "teste") :route-name :info]
-        ["/json" :get (conj common-interceptors-json `get-json) :route-name :json]}))
+      #{[(str base-url "/info") :get (conj common-interceptors-json `get-info) :route-name :info]
+        [(str base-url "/order") :get (conj common-interceptors-json `order-server/get-all)]
+        [(str base-url "/order/:id") :get (conj common-interceptors-json `order-server/get-by-uuid)]}))
 
 (defn start [system-map]
   (prn "Staring server...")
@@ -44,8 +36,9 @@
 (defn start-dev [system-map]
   (prn "Staring dev-server...")
   (reset! server
-          (http/start (http/create-server
-                        (assoc system-map ::http/join? false)))))
+          (http/start
+            (http/create-server
+              (assoc system-map ::http/join? false)))))
 
 (defn stop-dev []
        (http/stop @server))
